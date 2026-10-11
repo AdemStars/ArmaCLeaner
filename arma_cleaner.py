@@ -292,6 +292,80 @@ def mod_color(mod, val):
     return "#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255))
 
 
+class TaskbarProgress:
+    def __init__(self, hwnd):
+        self._ctypes = None
+        self._ole32 = None
+        self._taskbar = None
+        self._hwnd = None
+        self._com_initialized = False
+        self._set_state = None
+        self._set_value = None
+        self._release = None
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+            import uuid
+
+            self._ctypes = ctypes
+            self._ole32 = ctypes.WinDLL("ole32")
+            self._ole32.CoInitializeEx.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+            self._ole32.CoInitializeEx.restype = ctypes.c_long
+            if self._ole32.CoInitializeEx(None, 2) < 0:
+                return
+            self._com_initialized = True
+
+            class GUID(ctypes.Structure):
+                _fields_ = [("data", ctypes.c_ubyte * 16)]
+
+            clsid = GUID.from_buffer_copy(uuid.UUID("56FDF344-FD6D-11D0-958A-006097C9A090").bytes_le)
+            iid = GUID.from_buffer_copy(uuid.UUID("EA1AFB91-9E28-4B86-90E9-9E9F8A5EEA84").bytes_le)
+            self._ole32.CoCreateInstance.argtypes = [
+                ctypes.POINTER(GUID), ctypes.c_void_p, ctypes.c_ulong,
+                ctypes.POINTER(GUID), ctypes.POINTER(ctypes.c_void_p)]
+            self._ole32.CoCreateInstance.restype = ctypes.c_long
+            taskbar = ctypes.c_void_p()
+            if self._ole32.CoCreateInstance(ctypes.byref(clsid), None, 1,
+                                            ctypes.byref(iid), ctypes.byref(taskbar)) < 0:
+                self.close()
+                return
+            self._taskbar = taskbar
+            vtable = ctypes.cast(taskbar, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+            call = ctypes.WINFUNCTYPE
+            self._release = call(ctypes.c_ulong, ctypes.c_void_p)(vtable[2])
+            hr_init = call(ctypes.c_long, ctypes.c_void_p)(vtable[3])
+            self._set_value = call(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p,
+                                   ctypes.c_ulonglong, ctypes.c_ulonglong)(vtable[9])
+            self._set_state = call(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p,
+                                   ctypes.c_uint)(vtable[10])
+            if hr_init(taskbar) < 0:
+                self.close()
+                return
+            user32 = ctypes.WinDLL("user32")
+            user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+            user32.GetAncestor.restype = ctypes.c_void_p
+            self._hwnd = user32.GetAncestor(hwnd, 2) or hwnd
+            self._set_state(taskbar, self._hwnd, 1)
+        except (AttributeError, OSError, TypeError, ValueError):
+            self.close()
+
+    def set_progress(self, value, total):
+        if self._set_state and self._set_value and self._taskbar and self._hwnd:
+            self._set_state(self._taskbar, self._hwnd, 0)
+            self._set_value(self._taskbar, self._hwnd, value, total)
+
+    def close(self):
+        if self._set_state and self._taskbar and self._hwnd:
+            self._set_state(self._taskbar, self._hwnd, 0)
+        if self._release and self._taskbar:
+            self._release(self._taskbar)
+        self._taskbar = None
+        if self._com_initialized:
+            self._ole32.CoUninitialize()
+            self._com_initialized = False
+
+
 # ---------------------------------------------------------------- treemap
 def squarify(sizes, x, y, w, h):
     """Treemap 'squarified'. sizes triés décroissants. Retourne [(x, y, w, h)]."""
@@ -608,10 +682,11 @@ class App(tk.Tk):
         self.pbar = ttk.Progressbar(dlg, length=420, mode="indeterminate")
         self.pbar.pack(fill="x")
         self.pbar.start(12)
+        self.update_idletasks()
+        self.taskbar_progress = TaskbarProgress(self.winfo_id())
         self.p_pct = tk.StringVar(value="")
         ttk.Label(dlg, textvariable=self.p_pct).pack(anchor="e")
         ttk.Button(dlg, text="Annuler", command=self.cancel_compress).pack(anchor="e", pady=(6, 0))
-        self.update_idletasks()
         dlg.geometry("+%d+%d" % (self.winfo_rootx() + (self.winfo_width() - dlg.winfo_reqwidth()) // 2,
                                  self.winfo_rooty() + (self.winfo_height() - dlg.winfo_reqheight()) // 2))
         dlg.grab_set()
@@ -654,16 +729,21 @@ class App(tk.Tk):
             self.ptotal = int(text)
             self.pbar.stop()
             self.pbar.configure(mode="determinate", maximum=self.ptotal, value=0)
+            self.taskbar_progress.set_progress(0, self.ptotal)
         elif kind == "progress":
             v = min(int(text), self.ptotal)
             self.pbar["value"] = v
             self.p_pct.set(f"{v}/{self.ptotal} fichiers — {100 * v // self.ptotal} %")
+            self.taskbar_progress.set_progress(v, self.ptotal)
         elif kind == "detail":
             self.p_detail.set(text)
         else:
             self.compress_done(text)
 
     def compress_done(self, msg=""):
+        if getattr(self, "taskbar_progress", None):
+            self.taskbar_progress.close()
+            self.taskbar_progress = None
         if getattr(self, "pdlg", None):
             self.pdlg.grab_release()
             self.pdlg.destroy()

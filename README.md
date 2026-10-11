@@ -23,7 +23,7 @@ ni de voir ce qui prend de la place. Arma Cleaner scanne tes mods et te laisse t
 - **Favoris** ★ : protégés, jamais cochés ni supprimés.
 - **Mods hors workshop** signalés (⚠, orange) car Steam ne pourra pas les retélécharger.
 - **Dernier lancement** : lit les logs `.rpt` d'Arma 3 pour savoir quand chaque mod a été utilisé, et propose de filtrer « pas lancé depuis 30 / 90 / 180 jours / 1 an ».
-- **Compression NTFS** transparente (`compact.exe`, algorithmes XPRESS4K/8K/16K ou LZX) avec fenêtre de progression, annulable. Le jeu reste jouable, réversible via « Décompresser ».
+- **Compression NTFS** transparente (`compact.exe`, algorithmes XPRESS4K/8K/16K ou LZX) avec fenêtre et progression dans la barre des tâches Windows, annulable. Le jeu reste jouable, réversible via « Décompresser ».
 - **Clic droit** sur un mod : supprimer, compresser/décompresser, ouvrir le dossier, ouvrir la page Steam (via l'ID), copier l'ID, favori. Clic droit sur une liste : cocher, supprimer ou compresser ses mods, la retirer.
 - Après la suppression de mods Workshop, Arma Cleaner peut ouvrir leurs pages Steam pour permettre de s'en désabonner ; cette action reste à confirmer manuellement sur Steam.
 - **Thème clair / sombre**, réglages sauvegardés dans `%APPDATA%\ArmaCleaner\config.json`.
