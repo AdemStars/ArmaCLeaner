@@ -1023,6 +1023,8 @@ class App(tk.Tk):
             shutil.rmtree(m.path, onerror=onerror)
             if os.path.exists(m.path):
                 errors.append(m.name)
+        deleted_workshop = list({m.id: m for m in sel
+                                 if m.workshop and not os.path.exists(m.path)}.values())
         self.del_btn.state(["!disabled"])
         self.mods = [m for m in self.mods if os.path.exists(m.path)]
         self.refresh_lists()
@@ -1031,6 +1033,13 @@ class App(tk.Tk):
         if errors:
             messagebox.showwarning("Suppression incomplète",
                                    "Impossible de supprimer :\n" + "\n".join(errors[:20]))
+        if deleted_workshop and messagebox.askyesno(
+                "Désabonnement Steam",
+                f"{len(deleted_workshop)} mod(s) Workshop supprimé(s).\n\n"
+                "Steam peut les retélécharger tant que vous y êtes abonné. "
+                "Ouvrir leurs pages Workshop pour vous désabonner ?"):
+            for m in deleted_workshop:
+                self.open_steam(m)
 
 
 if __name__ == "__main__":
