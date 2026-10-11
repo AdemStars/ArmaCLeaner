@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pyinstaller
+      - run: python -m PyInstaller --onefile --windowed --clean --name ArmaCleaner --icon logo.ico --add-data "logo_win.png;." arma_cleaner.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArmaCleaner
+          path: dist/ArmaCleaner.exe
+      - name: Publier la release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ArmaCleaner.exe
+          generate_release_notes: true
