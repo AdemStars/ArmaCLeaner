@@ -293,6 +293,7 @@ def mod_color(mod, val):
 
 
 class TaskbarProgress:
+    TBPF_NOPROGRESS, TBPF_INDETERMINATE, TBPF_NORMAL = range(3)
     def __init__(self, hwnd):
         self._ctypes = None
         self._ole32 = None
@@ -346,18 +347,18 @@ class TaskbarProgress:
             user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
             user32.GetAncestor.restype = ctypes.c_void_p
             self._hwnd = user32.GetAncestor(hwnd, 2) or hwnd
-            self._set_state(taskbar, self._hwnd, 1)
+            self._set_state(taskbar, self._hwnd, self.TBPF_INDETERMINATE)
         except (AttributeError, OSError, TypeError, ValueError):
             self.close()
 
     def set_progress(self, value, total):
         if self._set_state and self._set_value and self._taskbar and self._hwnd:
-            self._set_state(self._taskbar, self._hwnd, 0)
+            self._set_state(self._taskbar, self._hwnd, self.TBPF_NORMAL)
             self._set_value(self._taskbar, self._hwnd, value, total)
 
     def close(self):
         if self._set_state and self._taskbar and self._hwnd:
-            self._set_state(self._taskbar, self._hwnd, 0)
+            self._set_state(self._taskbar, self._hwnd, self.TBPF_NOPROGRESS)
         if self._release and self._taskbar:
             self._release(self._taskbar)
         self._taskbar = None
